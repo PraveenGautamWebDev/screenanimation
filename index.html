@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KamelPay – Manage Your Company's Expenses</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
+
+  <style>
+    /* ── Reset & Base ── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: auto;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #edf1ff;
+      color: #1a1a2e;
+      overflow-x: hidden;
+    }
+
+    /* ── Scroll Progress ── */
+    #scroll-progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 3px;
+      width: 0%;
+      background: linear-gradient(90deg, #2748dc, #5b8fff);
+      z-index: 9999;
+      pointer-events: none;
+    }
+
+    /* ════════════════════════════════════════════════
+       MAIN SCROLL CONTAINER
+    ════════════════════════════════════════════════ */
+    #main-scroll-container {
+      position: relative;
+      height: 230vh;
+      /* Scroll budget */
+    }
+
+    #sticky-view {
+      position: sticky;
+      top: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(ellipse 130% 90% at 50% -10%, #cdd9ff 0%, #ffffff 50%, #ffffff 100%);
+    }
+
+    /* Ambient blobs for background */
+    .blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(100px);
+      pointer-events: none;
+      opacity: 0.35;
+      z-index: 1;
+    }
+
+    .blob-a {
+      width: 600px;
+      height: 600px;
+      background: #b8ccff;
+      top: -180px;
+      right: -200px;
+    }
+
+    .blob-b {
+      width: 460px;
+      height: 460px;
+      background: #ccd8ff;
+      bottom: -100px;
+      left: -120px;
+    }
+
+    /* ════════════════════════════════════════════════
+       HERO OVERLAY (Fades out)
+       Contains the white gradient and initial text
+    ════════════════════════════════════════════════ */
+    #hero-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(180deg, #ffffff, #ffffffbd);
+    }
+
+    #hero-overlay::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 250px;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0.6) 40%, transparent 100%);
+      z-index: -1;
+    }
+
+    .hero-watermark {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: clamp(64px, 14vw, 180px);
+      font-weight: 900;
+      letter-spacing: -2px;
+      color: rgba(60, 90, 220, 0.08);
+      white-space: nowrap;
+      user-select: none;
+      display: none;
+      /* User commented this out in prompt */
+    }
+
+    .hero-tagline {
+      margin-top: -65vh;
+      /* Push to top part of the screen */
+      font-size: clamp(20px, 2.7vw, 34px);
+      font-weight: 700;
+      color: #1a2a5c;
+      letter-spacing: -0.2px;
+      text-align: center;
+      text-shadow: 0 4px 16px rgba(255, 255, 255, 0.9);
+      z-index: 2;
+    }
+
+    /* ════════════════════════════════════════════════
+       THE FLYING DASHBOARD
+       Starts 100vw/100vh, then shrinks mapped exactly
+       to the app screen coordinates using GSAP
+    ════════════════════════════════════════════════ */
+    #flying-dashboard {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      object-position: top left;
+      z-index: 6;
+      /* Below hero-overlay, above frame */
+      pointer-events: none;
+      transform-origin: 0 0;
+      will-change: transform, border-radius;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+      /* Adds depth when flying */
+    }
+
+    /* ════════════════════════════════════════════════
+       HOTSPOTS (Invisible Clickable Zones on Image)
+    ════════════════════════════════════════════════ */
+    .image-map-zones {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 22%;
+      /* Width of the sidebar in the image */
+      height: 100%;
+      z-index: 10;
+    }
+
+    .hotspot {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 5.5%;
+      cursor: pointer;
+      z-index: 11;
+      /* border: 1px solid #000000; */
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      animation: pulse-hotspot 2.5s infinite ease-in-out;
+    }
+
+    .hotspot:hover {
+      background: rgba(60, 100, 240, 0.12);
+      border: 1px solid rgba(60, 100, 240, 0.4);
+      animation: none;
+      transform: scale(1.02);
+    }
+
+    @keyframes pulse-hotspot {
+      0% {
+        box-shadow: inset 0 0 0 1px rgba(60, 100, 240, 0.0);
+        background: rgba(60, 100, 240, 0);
+      }
+
+      50% {
+        box-shadow: inset 0 0 0 1px rgba(60, 100, 240, 0.4);
+        background: rgba(60, 100, 240, 0.04);
+      }
+
+      100% {
+        box-shadow: inset 0 0 0 1px rgba(60, 100, 240, 0);
+        background: rgba(60, 100, 240, 0);
+      }
+    }
+
+    /* ════════════════════════════════════════════════
+       APP FRAME (Always here, behind flying dash)
+    ════════════════════════════════════════════════ */
+    #laptop-container {
+      position: relative;
+      width: min(730px, 90vw);
+      z-index: 4;
+      filter: drop-shadow(0 20px 40px rgba(20, 30, 80, 0.08));
+      transform-style: preserve-3d;
+      will-change: transform;
+    }
+
+    .app-frame {
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 12px;
+      box-shadow: 0 0 0 8px rgba(0, 0, 0, 0.04);
+      position: relative;
+    }
+
+    .laptop-screen {
+      position: relative;
+      overflow: hidden;
+      border-radius: 10px;
+      aspect-ratio: 16 / 10;
+      background: #f5f6f8;
+      box-shadow: 2px 2px 10px 15px rgb(0 0 0 / 6%);
+    }
+
+    /* The actual tab images inside the frame */
+    .tab-img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: top left;
+      opacity: 0;
+      pointer-events: none;
+      border-radius: 10px;
+    }
+
+    .tab-img.active {
+      opacity: 1;
+    }
+
+
+
+    /* ════════════════════════════════════════════════
+       APP DECORATIONS (Text and Man)
+    ════════════════════════════════════════════════ */
+    #desktop-decorations {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 3;
+      /* Behind laptop frame */
+      opacity: 0;
+      /* Fade in via GSAP */
+    }
+
+    .decor-left-text {
+      position: absolute;
+      top: 24%;
+      left: 10%;
+      transform: translateY(-50%);
+      font-size: clamp(22px, 3vw, 24px);
+      font-weight: 600;
+      color: #0b1461;
+      line-height: 1.25;
+      letter-spacing: -1px;
+    }
+
+    .decor-right-man {
+      position: absolute;
+      bottom: 0;
+      right: 3%;
+      /* height: 65vh; */
+      height: 75vh;
+      max-height: 800px;
+      display: flex;
+    }
+
+    .decor-right-man img {
+      height: 100%;
+      width: auto;
+      object-fit: contain;
+      object-position: bottom;
+    }
+
+    .speech-bubble {
+      position: absolute;
+      top: -18%;
+      left: -10px;
+      width: 240px;
+      height: 180px;
+      background: url('message-box.png') no-repeat center center;
+      background-size: contain;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 500;
+      color: #0b1461;
+      text-align: center;
+      line-height: 1.25;
+      padding: 10px 30px 35px 20px;
+      /* Offset to keep text inside the drawn bubble area above the tail */
+      z-index: 10;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="scroll-progress"></div>
+
+  <div id="main-scroll-container">
+    <div id="sticky-view">
+      <div class="blob blob-a"></div>
+      <div class="blob blob-b"></div>
+
+      <!-- Fades out on scroll -->
+      <div id="hero-overlay">
+        <!-- <div class="hero-watermark">KamelPay</div> -->
+        <p class="hero-tagline">Get complete control over company spending</p>
+      </div>
+
+      <!-- App Decorations (Text & Man) -->
+      <div id="desktop-decorations">
+        <div class="decor-left-text">
+          Click on <br>the tabs<br>to see the<br>activity
+        </div>
+        <div class="decor-right-man">
+          <div class="speech-bubble">
+            <span id="dynamic-card-text">Get complete control over company spending</span>
+          </div>
+          <img src="man.png" alt="Man Pointing">
+        </div>
+      </div>
+
+      <!-- Target App frame -->
+      <div id="laptop-container">
+        <div class="app-frame">
+          <div class="laptop-screen" id="laptop-screen">
+            <!-- Background tabs inside frame -->
+            <img src="dashboard-1.gif" id="tab-img-0" class="tab-img active" alt="Dashboard View">
+            <img src="dashboard-2.png" id="tab-img-1" class="tab-img" alt="Organization View">
+            <img src="dashboard-3.png" id="tab-img-2" class="tab-img" alt="Approval View">
+            <img src="dashboard-4.png" id="tab-img-3" class="tab-img" alt="Wallet View">
+            <img src="dashboard-5.png" id="tab-img-4" class="tab-img" alt="absoluteCards View">
+            <img src="dashboard-6.png" id="tab-img-5" class="tab-img" alt="Team Members">
+            <img src="dashboard-7.png" id="tab-img-6" class="tab-img" alt="Approvals">
+            <img src="dashboard-8.png" id="tab-img-7" class="tab-img" alt="Transactions">
+            <img src="dashboard-9.png" id="tab-img-8" class="tab-img" alt="Receipt Reminder">
+            <img src="dashboard-10.png" id="tab-img-9" class="tab-img" alt="Spending Rules">
+            <img src="dashboard-11.png" id="tab-img-10" class="tab-img" alt="Dispute Transactions">
+            <img src="dashboard-12.png" id="tab-img-11" class="tab-img" alt="Reports & Analytics">
+
+            <!-- Interactive Image Map Zones covering sidebar links -->
+            <div class="image-map-zones">
+              <div class="hotspot" data-tab="0" title="Dashboard" style="top: 22.3%;"></div>
+              <div class="hotspot" data-tab="1" title="Organization" style="top: 29%;"></div>
+              <div class="hotspot" data-tab="2" title="Approval Workflow" style="top: 35%;"></div>
+              <div class="hotspot" data-tab="3" title="Wallets" style="top: 41.5%;"></div>
+              <div class="hotspot" data-tab="4" title="absoluteCard" style="top: 48%;"></div>
+              <div class="hotspot" data-tab="5" title="Team Members" style="top: 54.5%;"></div>
+              <div class="hotspot" data-tab="6" title="Approvals" style="top: 61%;"></div>
+              <div class="hotspot" data-tab="7" title="Transactions" style="top: 67.4%;"></div>
+              <div class="hotspot" data-tab="8" title="Receipt Reminder" style="top: 74%;"></div>
+              <div class="hotspot" data-tab="9" title="Spending Rules" style="top: 80.2%;"></div>
+              <div class="hotspot" data-tab="10" title="Dispute Transactions" style="top: 86.6%;"></div>
+              <div class="hotspot" data-tab="11" title="Reports & Analytics" style="top: 93%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- The animating image overlay -->
+      <img src="dashboard-1.png" id="flying-dashboard" alt="" aria-hidden="true" />
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+  <script>
+    gsap.registerPlugin(ScrollTrigger);
+
+    // Dynamic Texts mapped to the 12 tabs
+    const tabTexts = [
+      "Get complete control over company spending", // 1
+      "Create hierarchy across teams and departments", // 2
+      "Set approval rules across the system", // 3
+      "Track all wallet transactions in one place", // 4
+      "Issue cards by transaction type", // 5
+      "Invite team members and define roles", // 6
+      "Manage all approvals with a single click", // 7
+      "Track all cash inflows and outflows", // 8
+      "Automate receipt reminders", // 9
+      "Set spend limits by categories, teams, and cards", // 10
+      "Review all disputed transactions here", // 11
+      "Get audit-ready expense reports" // 12
+    ];
+
+    // Progress bar
+    const bar = document.getElementById('scroll-progress');
+    window.addEventListener('scroll', () => {
+      bar.style.width = (window.scrollY / (document.documentElement.scrollHeight - window.innerHeight) * 100) + '%';
+    }, { passive: true });
+
+    // Elements
+    const flyEl = document.getElementById('flying-dashboard');
+    const laptopScreen = document.getElementById('laptop-screen');
+    const heroOverlay = document.getElementById('hero-overlay');
+    const dynamicText = document.getElementById('dynamic-card-text');
+
+    let flyTl = null;
+
+    function buildAnimation() {
+      if (flyTl) {
+        if (flyTl.scrollTrigger) flyTl.scrollTrigger.kill();
+        flyTl.kill();
+      }
+
+      // Reset styles to get fresh calculation
+      gsap.set(flyEl, { clearProps: 'all' });
+      gsap.set(heroOverlay, { clearProps: 'all' });
+
+      // We calculate scale and position based on laptopScreen
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const r = laptopScreen.getBoundingClientRect();
+
+      // Ensure flying dashboard starts full screen physically
+      gsap.set(flyEl, { width: vw, height: vh, top: 0, left: 0, x: 0, y: 0, scaleX: 1, scaleY: 1, borderRadius: 0 });
+
+      flyTl = gsap.timeline({
+        scrollTrigger: {
+          trigger: '#main-scroll-container',
+          start: 'top top',
+          end: 'bottom bottom',
+          scrub: 0.5, // Smooth interpolation
+        }
+      });
+
+      // 0 - 20%: Fade out hero text
+      flyTl.to(heroOverlay, { opacity: 0, y: -40, duration: 20 }, 0);
+
+      // 10 - 75%: Shrink image to fit screen exactly
+      // Animating physical width/top gives a perfect geometric diagonal crop
+      flyTl.to(flyEl, {
+        left: r.left,
+        top: r.top,
+        width: r.width,
+        height: r.height,
+        borderRadius: "10px", // Match new frame inner border radius
+        boxShadow: "0 5px 15px rgba(0,0,0,0)", // Flatten out shadow when docked
+        ease: 'power2.inOut',
+        duration: 70          // Takes 70% of the scroll timeline
+      }, 10);
+
+      // Fade in the decorations seamlessly alongside the laptop docking
+      flyTl.to('#desktop-decorations', { opacity: 1, duration: 30, ease: 'power1.inOut' }, 45);
+
+      // 80 - 100%: Fade out the flying element, relying on the identical underlying image inside frame
+      flyTl.to(flyEl, { opacity: 0, duration: 20 }, 80);
+    }
+
+    // Build timeline on load and resize
+    window.addEventListener('load', () => {
+      window.scrollTo(0, 0); // Start cleanly at top
+      setTimeout(() => {
+        buildAnimation();
+        ScrollTrigger.refresh();
+      }, 100);
+    });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        buildAnimation();
+        ScrollTrigger.refresh();
+      }, 200);
+    });
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       INTERACTIVE TABS  — click logic via hotspots
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    const hotspots = document.querySelectorAll('.hotspot');
+    const tabImgs = document.querySelectorAll('.tab-img');
+    let activeTab = 0;
+
+    hotspots.forEach(btn => {
+      const idx = +btn.dataset.tab;
+
+      btn.addEventListener('click', () => {
+        if (idx === activeTab) return;
+
+        // Hide the flying element instantly if clicked
+        gsap.set(flyEl, { opacity: 0 });
+
+        // Update Dynamic Text
+        gsap.to(dynamicText, {
+          opacity: 0, duration: 0.15, onComplete: () => {
+            dynamicText.innerText = tabTexts[idx];
+            gsap.to(dynamicText, { opacity: 1, duration: 0.15 });
+          }
+        });
+
+        // Crossfade Images
+        tabImgs[idx].classList.add('active');
+        gsap.fromTo(tabImgs[idx],
+          { opacity: 0, scale: 1.02 },
+          { opacity: 1, scale: 1, duration: 0.35, ease: 'power2.out' }
+        );
+        gsap.to(tabImgs[activeTab], {
+          opacity: 0, duration: 0.25, ease: 'power1.in',
+          onComplete: () => tabImgs[activeTab].classList.remove('active'),
+        });
+
+        activeTab = idx;
+      });
+    });
+
+    /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+       LAPTOP TILT EFFECT (Hover)
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+    const laptopWrap = document.getElementById('laptop-container');
+    laptopWrap.addEventListener('mousemove', e => {
+      // Allow tilt only if we're decently scrolled down
+      if (window.scrollY < window.innerHeight * 0.8) return;
+
+      const r = laptopWrap.getBoundingClientRect();
+      const rx = ((e.clientX - r.left - r.width / 2) / r.width) * 5;
+      const ry = ((e.clientY - r.top - r.height / 2) / r.height) * -3.5;
+      gsap.to(laptopWrap, {
+        rotateY: rx, rotateX: ry,
+        transformPerspective: 1200,
+        ease: 'power2.out', duration: 0.5,
+      });
+    });
+    laptopWrap.addEventListener('mouseleave', () => {
+      gsap.to(laptopWrap, { rotateY: 0, rotateX: 0, ease: 'elastic.out(1, 0.5)', duration: 1.2 });
+    });
+  </script>
+</body>
+
+</html>
